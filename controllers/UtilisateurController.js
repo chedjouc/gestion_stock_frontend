@@ -7,49 +7,44 @@ import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv'
 
 dotenv.config() 
-// Assurez-vous que cette variable est dans votre .env
 const JWT_SECRET = process.env.JWT_SECRET || 'votre_cle_secrete_par_defaut' 
 
-// --- 1. READ (All) : Récupérer tous les utilisateurs (GET) ---
+// =========================================================
+// 1. LECTURE (READ) - LISTE
+// =========================================================
+
+// AFFICHER LA LISTE (GET /utilisateurs)
 export const getAllUtilisateurs = async (req, res) => {
     try {
         const result = await Utilisateur.findAll({
-            // Exclure le mot de passe pour des raisons de sécurité
             attributes: { exclude: ['motDePasse'] }, 
             include: [Role]
         }) 
-        res.status(200).json({ data: result }) 
+        // Affiche la vue 'list.ejs' avec les données
+        res.render('utilisateurs/list', { users: result }) 
     } catch (error) {
-        res.status(500).json({ message: error.message }) 
+        res.status(500).send("Erreur : " + error.message) 
     }
 }
 
-// --- 2. READ (One) : Récupérer un utilisateur par ID (GET /:id) ---
-export const getUtilisateurById = async (req, res) => {
-    const { id } = req.params 
+// =========================================================
+// 2. AJOUT (CREATE)
+// =========================================================
 
-    if (!id) return res.status(400).json({ message: 'L\'ID est requis.'}) 
-
+// AFFICHER LE FORMULAIRE D'AJOUT (GET /utilisateurs/ajouter)
+export const renderAddForm = async (req, res) => {
     try {
-        const result = await Utilisateur.findByPk(id, {
-            attributes: { exclude: ['motDePasse'] }, 
-            include: [Role]
-        }) 
-        
-        if (!result) {
-            return res.status(404).json({ message: 'Utilisateur non trouvé.' })
-        }
-        
-        res.status(200).json({ data: result })
+        // On a besoin de la liste des rôles pour le menu déroulant
+        const roles = await Role.findAll();
+        res.render('utilisateurs/add', { roles: roles });
     } catch (error) {
-        res.status(500).json({ message: error.message })
+        res.status(500).send("Erreur : " + error.message);
     }
 }
 
-// --- 3. CREATE : Ajouter un nouvel utilisateur (POST) ---
+// TRAITER LE FORMULAIRE D'AJOUT (POST /utilisateurs/ajouter)
 export const addUtilisateur = async (req, res) => {
     try {
-        // 1. Hachage du mot de passe
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(req.body.motDePasse, salt);
         
@@ -57,23 +52,43 @@ export const addUtilisateur = async (req, res) => {
             nom: req.body.nom, 
             prenom: req.body.prenom,
             email: req.body.email,
-            motDePasse: hashedPassword, // Utiliser le hachage
+            motDePasse: hashedPassword,
             roleId: req.body.roleId 
         }
 
-        const result = await Utilisateur.create(newUser) 
-        
-        // Exclure le mot de passe du retour
-        result.motDePasse = undefined;
-        res.status(201).json({ data: result, message: "Utilisateur créé avec succès."}) 
+        await Utilisateur.create(newUser) 
+        // Une fois créé, on retourne à la liste
+        res.redirect('/utilisateurs');
+
     } catch (error) {
-        res.status(400).json({ message: error.message }) 
+        res.status(400).send("Erreur lors de l'ajout : " + error.message) 
     }
 }
 
-// --- 4. UPDATE : Mettre à jour un utilisateur (PUT /:id) ---
+// =========================================================
+// 3. MODIFICATION (UPDATE)
+// =========================================================
+
+// AFFICHER LE FORMULAIRE DE MODIFICATION (GET /utilisateurs/edit/:id)
+export const renderEditForm = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const user = await Utilisateur.findByPk(id);
+        const roles = await Role.findAll();
+
+        if (!user) {
+            return res.status(404).send("Utilisateur non trouvé");
+        }
+        res.render('utilisateurs/edit', { user: user, roles: roles });
+    } catch (error) {
+        res.status(500).send("Erreur : " + error.message);
+    }
+}
+
+// TRAITER LE FORMULAIRE DE MODIFICATION (POST /utilisateurs/edit/:id)
 export const updateUtilisateur = async (req, res) => {
     const { id } = req.params
+    
     let updatedData = { 
         nom: req.body.nom, 
         prenom: req.body.prenom,
@@ -81,79 +96,81 @@ export const updateUtilisateur = async (req, res) => {
         roleId: req.body.roleId
     }
 
-    if (req.body.motDePasse) { // Hacher seulement si le mot de passe est fourni
+    // On ne hache le mot de passe que s'il a été modifié (champ non vide)
+    if (req.body.motDePasse) { 
         const salt = await bcrypt.genSalt(10);
         updatedData.motDePasse = await bcrypt.hash(req.body.motDePasse, salt);
     }
     
-    if (!id) return res.status(400).json({ message: 'L\'ID est requis.' }) 
-    
     try {
-        const [updatedRows] = await Utilisateur.update(updatedData, { where: { id } }) 
-
-        if (updatedRows === 0) {
-            return res.status(404).json({ message: `Utilisateur avec l'ID ${id} non trouvé.` })
-        }
-        
-        res.status(200).json({ message: `Utilisateur avec l'ID ${id} mis à jour avec succès.`, updatedRows }) 
+        await Utilisateur.update(updatedData, { where: { id } }) 
+        // Une fois modifié, on retourne à la liste
+        res.redirect('/utilisateurs');
     } catch (error) {
-        res.status(400).json({ message: error.message })
+        res.status(400).send("Erreur lors de la mise à jour : " + error.message)
     }
 }
 
-// --- 5. DELETE : Supprimer un utilisateur (DELETE /:id) ---
+// =========================================================
+// 4. SUPPRESSION (DELETE)
+// =========================================================
+
+// SUPPRIMER UN UTILISATEUR (GET /utilisateurs/delete/:id)
 export const deleteUtilisateur = async (req, res) => {
     const { id } = req.params
-
-    if (!id) return res.status(400).json({ error: true, message: "L\'ID est requis." }) 
-
     try {
-        const deletedRows = await Utilisateur.destroy({ where: { id }}) 
-
-        if (deletedRows === 0) {
-            return res.status(404).json({ message: `Utilisateur avec l\'ID ${id} non trouvé.` }) 
-        }
-        
-        res.status(200).json({ message: `L\'utilisateur ${id} a été supprimé avec succès.` })
+        await Utilisateur.destroy({ where: { id }}) 
+        // Une fois supprimé, on recharge la liste
+        res.redirect('/utilisateurs');
     } catch (error) {
-        res.status(400).json({ error: true, message: error.message }) 
+        res.status(400).send("Erreur lors de la suppression : " + error.message) 
     }
 }
 
+// =========================================================
+// 5. AUTHENTIFICATION (LOGIN)
+// =========================================================
 
-// --- 6. AUTHENTIFICATION : Fonction de Login (POST /login) ---
+// AFFICHER LE FORMULAIRE DE LOGIN (GET /login)
+export const renderLogin = (req, res) => {
+    res.render('login'); // Affiche views/login.ejs
+}
+
+// TRAITER LE LOGIN (POST /login)
 export const loginUtilisateur = async (req, res) => {
     const { email, motDePasse } = req.body;
-    
-    if (!email || !motDePasse) {
-        return res.status(400).json({ message: 'Email et mot de passe sont requis.' });
-    }
 
     try {
-        // 1. Trouver l'utilisateur (inclure motDePasse pour la comparaison)
+        // 1. Chercher l'utilisateur par son email
         const utilisateur = await Utilisateur.findOne({ where: { email } });
-
+        
+        // Si pas trouvé -> On réaffiche la page login avec une erreur
         if (!utilisateur) {
-            return res.status(401).json({ message: 'Identifiants invalides.' });
+            return res.render('login', { error: 'Email introuvable.' });
         }
         
-        // 2. Comparer le mot de passe fourni avec le hachage enregistré
+        // 2. Vérifier le mot de passe
         const isMatch = await bcrypt.compare(motDePasse, utilisateur.motDePasse);
-
+        
         if (!isMatch) {
-            return res.status(401).json({ message: 'Identifiants invalides.' });
+            return res.render('login', { error: 'Mot de passe incorrect.' });
         }
 
-        // 3. Générer le JSON Web Token (JWT)
-        const token = jwt.sign(
-            { id: utilisateur.id, roleId: utilisateur.roleId }, 
-            JWT_SECRET,
-            { expiresIn: '1h' }
-        );
+        // 3. ENREGISTRER DANS LA SESSION
+        // C'est ce qui permet au site de se "souvenir" que tu es connecté
+        req.session.user = {
+            id: utilisateur.id,
+            email: utilisateur.email,
+            nom: utilisateur.nom,
+            prenom: utilisateur.prenom,
+            roleId: utilisateur.roleId
+        };
 
-        res.status(200).json({ token, utilisateur: { id: utilisateur.id, email: utilisateur.email, roleId: utilisateur.roleId } });
+        // 4. Succès -> Redirection vers l'accueil
+        console.log(`Utilisateur ${email} connecté avec succès !`);
+        res.redirect('/'); 
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.render('login', { error: "Erreur technique : " + error.message });
     }
 }

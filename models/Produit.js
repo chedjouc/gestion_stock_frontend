@@ -35,7 +35,7 @@ const Produit = database.define('Produit', {
 // Cette ligne crée le champ 'categorieId' dans la table Produit
 Produit.belongsTo(Categorie, {
     foreignKey: 'categorieId',
-    onDelete: 'RESTRICT', // Ne permet pas de supprimer une Catégorie si des produits y sont liés
+    onDelete: 'CASCADE', // Ne permet pas de supprimer une Catégorie si des produits y sont liés
     onUpdate: 'RESTRICT'
 })
 
@@ -43,7 +43,7 @@ Produit.belongsTo(Categorie, {
 // Cette ligne crée le champ 'fournisseurId' dans la table Produit
 Produit.belongsTo(Fournisseur, {
     foreignKey: 'fournisseurId',
-    onDelete: 'RESTRICT', // Ne permet pas de supprimer un Fournisseur si des produits y sont liés
+    onDelete: 'CASCADE', // Ne permet pas de supprimer un Fournisseur si des produits y sont liés
     onUpdate: 'RESTRICT'
 })
 

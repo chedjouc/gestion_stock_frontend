@@ -1,10 +1,11 @@
 // controllers/HistoriqueStockController.js
 
 import HistoriqueStock from '../models/HistoriqueStock.js'
-import Produit from '../models/Produit.js' // Nécessaire pour mettre à jour la quantité du produit
-import Utilisateur from '../models/Utilisateur.js' // Pour l'inclusion
+import Produit from '../models/Produit.js' 
+import Utilisateur from '../models/Utilisateur.js' 
 
 // --- 1. READ (All) : Récupérer tout l'historique (GET) ---
+// 🔑 FIX: Ajout du mot-clé 'export'
 export const getAllHistorique = async (req, res) => {
     try {
         const result = await HistoriqueStock.findAll({
@@ -18,15 +19,20 @@ export const getAllHistorique = async (req, res) => {
 }
 
 // --- 2. CREATE : Enregistrer un nouveau mouvement de stock (POST) ---
+// 🔑 FIX: Ajout du mot-clé 'export'
 export const addMouvementStock = async (req, res) => {
-    const { produitId, quantiteChangee, utilisateurId } = req.body
+    // 1. 🔑 SÉCURITÉ : On prend l'ID utilisateur du jeton JWT (req.utilisateur est rempli par le middleware 'authentification')
+    const utilisateurId = req.utilisateur.id; 
 
-    // Validation minimale
-    if (!produitId || !quantiteChangee || !utilisateurId) {
-        return res.status(400).json({ message: 'produitId, quantiteChangee et utilisateurId sont requis.' })
+    // 2. CORRECTION : On prend uniquement les données non sécurisées du corps
+    // L'utilisateur ne peut plus envoyer son propre ID utilisateur dans le corps (sécurité)
+    const { produitId, quantiteChangee } = req.body
+
+    // Validation minimale (ne vérifie plus utilisateurId dans le corps)
+    if (!produitId || !quantiteChangee) {
+        return res.status(400).json({ message: 'produitId et quantiteChangee sont requis.' })
     }
 
-    // Convertir la quantité en entier (elle peut être positive ou négative)
     const mouvement = parseInt(quantiteChangee)
 
     try {
@@ -34,7 +40,7 @@ export const addMouvementStock = async (req, res) => {
         const mouvementEnregistre = await HistoriqueStock.create({
             produitId,
             quantiteChangee: mouvement,
-            utilisateurId
+            utilisateurId // Utilise l'ID sécurisé du jeton!
         })
         
         // 2. Mettre à jour la quantité du produit
@@ -44,13 +50,7 @@ export const addMouvementStock = async (req, res) => {
             return res.status(404).json({ message: 'Produit non trouvé pour la mise à jour du stock.' })
         }
 
-        // Nouvelle quantité = ancienne quantité + mouvement
         const nouvelleQuantite = produit.quantite + mouvement
-
-        if (nouvelleQuantite < 0) {
-            // Optionnel: Gérer une tentative de sortie qui rendrait le stock négatif
-            // Si c'est le cas, vous devriez idéalement annuler la transaction d'historique (Transactions Sequelize)
-        }
         
         await Produit.update(
             { quantite: nouvelleQuantite }, 
@@ -67,10 +67,8 @@ export const addMouvementStock = async (req, res) => {
     }
 }
 
-// Nous n'incluons pas de fonctions update ou delete pour l'historique,
-// car l'historique devrait être immuable.
-
 // --- 3. READ (By Product) : Récupérer l'historique d'un produit (GET /produit/:id) ---
+// 🔑 FIX: Ajout du mot-clé 'export'
 export const getHistoriqueByProduit = async (req, res) => {
     const { idProduit } = req.params 
 

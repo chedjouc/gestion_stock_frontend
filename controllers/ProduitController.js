@@ -1,46 +1,47 @@
 // controllers/ProduitController.js
 
 import Produit from '../models/Produit.js'
-// Importez les modèles liés pour l'inclusion dans les requêtes GET (pour voir les détails)
+// Importez les modèles liés pour l'inclusion dans les requêtes et les formulaires
 import Categorie from '../models/Categorie.js'
 import Fournisseur from '../models/Fournisseur.js'
 
-// --- 1. READ (All) : Récupérer tous les produits (GET) ---
+// =========================================================
+// 1. LECTURE (READ) - LISTE
+// =========================================================
 export const getAllProduits = async (req, res) => {
     try {
         // Option 'include' pour afficher les détails de la Catégorie et du Fournisseur
         const result = await Produit.findAll({
             include: [Categorie, Fournisseur]
         }) 
-        res.status(200).json({ data: result }) 
+        // MODIFICATION : On affiche la vue 'produits/list.ejs'
+        res.render('produits/list', { produits: result }) 
     } catch (error) {
-        res.status(500).json({ message: error.message }) 
+        res.status(500).send("Erreur : " + error.message) 
     }
 }
 
-// --- 2. READ (One) : Récupérer un produit par ID (GET /:id) ---
-export const getProduitById = async (req, res) => {
-    const { id } = req.params 
+// =========================================================
+// 2. AJOUT (CREATE)
+// =========================================================
 
-    if (!id) return res.status(400).json({ message: 'L\'ID est requis.'}) 
-
+// NOUVEAU : Afficher le formulaire d'ajout
+export const renderAddProduit = async (req, res) => {
     try {
-        // Option 'include' pour afficher les détails des tables liées
-        const result = await Produit.findByPk(id, {
-            include: [Categorie, Fournisseur]
-        }) 
+        // On récupère les catégories et fournisseurs pour les listes déroulantes
+        const categories = await Categorie.findAll();
+        const fournisseurs = await Fournisseur.findAll();
         
-        if (!result) {
-            return res.status(404).json({ message: 'Produit non trouvé.' })
-        }
-        
-        res.status(200).json({ data: result })
+        res.render('produits/add', { 
+            categories: categories,
+            fournisseurs: fournisseurs
+        });
     } catch (error) {
-        res.status(500).json({ message: error.message })
+        res.status(500).send("Erreur : " + error.message);
     }
 }
 
-// --- 3. CREATE : Ajouter un nouveau produit (POST) ---
+// Traiter l'ajout
 export const addProduit = async (req, res) => {
     const newProduit = { 
         nom: req.body.nom, 
@@ -51,17 +52,39 @@ export const addProduit = async (req, res) => {
     }
 
     try {
-        const result = await Produit.create(newProduit) 
-        res.status(201).json({ data: result, message: "Produit créé avec succès."}) 
+        await Produit.create(newProduit) 
+        // MODIFICATION : Redirection vers la liste
+        res.redirect('/produits');
     } catch (error) {
-        // Gérer les erreurs (ex: FK inexistante, champ manquant)
-        res.status(400).json({ message: error.message }) 
+        res.status(400).send("Erreur lors de l'ajout : " + error.message) 
     }
 }
 
-// --- 4. UPDATE : Mettre à jour un produit (PUT /:id) ---
-// Note: Ici, la mise à jour de la 'quantite' n'est pas recommandée 
-// sans un enregistrement dans l'HistoriqueStock.
+// =========================================================
+// 3. MODIFICATION (UPDATE)
+// =========================================================
+
+// NOUVEAU : Afficher le formulaire de modification
+export const renderEditProduit = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const produit = await Produit.findByPk(id);
+        const categories = await Categorie.findAll();
+        const fournisseurs = await Fournisseur.findAll();
+
+        if (!produit) return res.status(404).send("Produit introuvable");
+
+        res.render('produits/edit', { 
+            produit: produit,
+            categories: categories,
+            fournisseurs: fournisseurs
+        });
+    } catch (error) {
+        res.status(500).send("Erreur : " + error.message);
+    }
+}
+
+// Traiter la modification
 export const updateProduit = async (req, res) => {
     const { id } = req.params
     const updatedData = { 
@@ -72,36 +95,25 @@ export const updateProduit = async (req, res) => {
         fournisseurId: req.body.fournisseurId,
     }
 
-    if (!id) return res.status(400).json({ message: 'L\'ID est requis.' }) 
-    
     try {
-        const [updatedRows] = await Produit.update(updatedData, { where: { id } }) 
-
-        if (updatedRows === 0) {
-            return res.status(404).json({ message: `Produit avec l'ID ${id} non trouvé.` })
-        }
-        
-        res.status(200).json({ message: `Produit avec l'ID ${id} mis à jour avec succès.`, updatedRows }) 
+        await Produit.update(updatedData, { where: { id } }) 
+        // MODIFICATION : Redirection vers la liste
+        res.redirect('/produits');
     } catch (error) {
-        res.status(400).json({ message: error.message })
+        res.status(400).send("Erreur lors de la modification : " + error.message)
     }
 }
 
-// --- 5. DELETE : Supprimer un produit (DELETE /:id) ---
+// =========================================================
+// 4. SUPPRESSION (DELETE)
+// =========================================================
 export const deleteProduit = async (req, res) => {
     const { id } = req.params
-
-    if (!id) return res.status(400).json({ error: true, message: "L'ID est requis." }) 
-
     try {
-        const deletedRows = await Produit.destroy({ where: { id }}) 
-
-        if (deletedRows === 0) {
-            return res.status(404).json({ message: `Produit avec l'ID ${id} non trouvé.` }) 
-        }
-        
-        res.status(200).json({ message: `Le produit ${id} a été supprimé avec succès.` })
+        await Produit.destroy({ where: { id }}) 
+        // MODIFICATION : Redirection vers la liste
+        res.redirect('/produits');
     } catch (error) {
-        res.status(400).json({ error: true, message: error.message }) 
+        res.status(400).send("Erreur lors de la suppression : " + error.message) 
     }
 }

@@ -1,7 +1,6 @@
 // routes/fournisseurRoutes.js
 
 import express from 'express'
-// Importez toutes les fonctions du contrôleur
 import { 
     getAllFournisseurs, 
     getFournisseurById, 
@@ -10,24 +9,22 @@ import {
     deleteFournisseur 
 } from '../controllers/FournisseurController.js'
 
-// Créez une instance du Router d'Express
+// 1. On importe le middleware de sécurité (Session)
+import { isLogged } from '../middleware/auth.js'; 
+
 const router = express.Router()
 
-// --- Définition des Routes CRUD pour l'entité Fournisseur ---
+// 2. On protège toutes les routes avec isLogged
 
-// Route pour GET (Voir tous) et POST (Créer)
-// Chemin: /api/fournisseurs
+// Route principale /api/fournisseurs
 router.route('/')
-    .get(getAllFournisseurs)  // Correspond à GET /api/fournisseurs
-    .post(addFournisseur)     // Correspond à POST /api/fournisseurs
+    .get(isLogged, getAllFournisseurs)  // Protégé
+    .post(isLogged, addFournisseur)     // Protégé
 
-// Route pour GET (Voir un seul), PUT/PATCH (Mettre à jour) et DELETE (Supprimer)
-// Chemin: /api/fournisseurs/:id
-// Le ':id' permet de passer un paramètre de route (req.params.id) [cite: 174, 221]
+// Route par ID /api/fournisseurs/:id
 router.route('/:id')
-    .get(getFournisseurById)   // Correspond à GET /api/fournisseurs/:id
-    .put(updateFournisseur)    // Correspond à PUT /api/fournisseurs/:id (Mise à jour complète)
-    // Note: Dans ce cas, nous utilisons PUT pour la mise à jour, comme un PATCH n'est pas nécessaire ici
+    .get(isLogged, getFournisseurById)  // Protégé
+    .put(isLogged, updateFournisseur)   // Protégé
+    .delete(isLogged, deleteFournisseur)// Protégé
 
-// Exportez le routeur pour qu'il puisse être utilisé dans index.js
 export default router

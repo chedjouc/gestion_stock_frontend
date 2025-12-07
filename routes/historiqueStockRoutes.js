@@ -1,6 +1,10 @@
 // routes/historiqueStockRoutes.js
 
 import express from 'express'
+
+// --- CORRECTION : On importe isLogged au lieu de authentification ---
+import { isLogged } from '../middleware/auth.js'
+
 import { 
     getAllHistorique, 
     addMouvementStock, 
@@ -10,12 +14,12 @@ import {
 const router = express.Router()
 
 router.route('/')
-    .get(getAllHistorique)       // GET /api/stock/historique (Voir tout l'historique)
-    .post(addMouvementStock)     // POST /api/stock/historique (Enregistrer un mouvement)
+    // On remplace authentification par isLogged partout
+    .get(isLogged, getAllHistorique)       // GET /api/stock/historique
+    .post(isLogged, addMouvementStock)     // POST /api/stock/historique
     
 router.route('/produit/:idProduit')
-    .get(getHistoriqueByProduit) // GET /api/stock/historique/produit/:idProduit (Historique par produit)
-
-// Nous n'avons pas de route PUT/DELETE pour l'historique
+    .get(isLogged, getHistoriqueByProduit) // GET /api/stock/historique/produit/:idProduit
+    .post(isLogged, addMouvementStock)
 
 export default router
